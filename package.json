@@ -1,6 +1,6 @@
 {
   "name": "wp-themes-gulp",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Common gulp tasks for compiling assets for WP themes",
   "author": "Some Web Media",
   "main": "index.js",
