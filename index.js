@@ -58,9 +58,9 @@ module.exports = (config) => {
     '!' + path.join(dirname, settings.themeRoot, settings.src.scss, '_*.scss'),
     '!' + STYLE
   ];
-  const JS = path.join(dirname, settings.themeRoot, settings.src.js, '*.js');
-  const JS_LIBS = settings.libs.length ? settings.libs.length : false;
   const PHP = path.join(dirname, settings.themeRoot, '/**/*.php');
+  const JS = path.join(dirname, settings.themeRoot, settings.src.js, '*.js');
+  const JS_LIBS = settings.libs.length ? settings.libs.map(lib => path.join(dirname, lib)) : false;
 
   gulp.task('style', () => {
     const conn = getFtpConnection();
