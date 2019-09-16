@@ -5,9 +5,9 @@
   "author": "Some Web Media",
   "main": "index.js",
   "dependencies": {
-    "@babel/cli": "^7.5.5",
-    "@babel/core": "^7.5.5",
-    "@babel/preset-env": "^7.5.5",
+    "@babel/cli": "^7.6.0",
+    "@babel/core": "^7.6.0",
+    "@babel/preset-env": "^7.6.0",
     "glob": "^7.1.4",
     "gulp": "^4.0.2",
     "gulp-add-src": "^1.0.0",
