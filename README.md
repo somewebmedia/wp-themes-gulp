@@ -9,18 +9,20 @@ Example usage in `gulpfile.js`:
 const wpThemesGulp = require('wp-themes-gulp');
 
 const gulpTasks = wpThemesGulp({
-  themeRoot: '../',
-  src: {
-    scss: '/src/scss/',
-    js: '/src/js/'
+  root: '../',
+  source: {
+    root: '/src/',
+    scss: '/scss/',
+    js: '/js/',
+    libs: [
+      '/node_modules/anylib/dist/anylib.min.js'
+    ]
   },
-  dest: {
-    css: '/assets/css/',
-    js: '/assets/js/'
-  },
-  libs: [
-    '/node_modules/anylib/dist/anylib.min.js'
-  ]
+  build: {
+    root: '/assets/',
+    css: '/css/',
+    js: '/js/'
+  }
 });
 
 module.exports = gulpTasks;

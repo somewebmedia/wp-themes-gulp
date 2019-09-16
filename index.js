@@ -41,29 +41,34 @@ function hasFtp() {
 module.exports = (config) => {
 
   const Settings = Object.assign({
-    themeRoot: '../',
-    src: {
-      scss: '/src/scss/',
-      js: '/src/js/'
+    root: '../',
+    source: {
+      root: '/src/',
+      scss: '/scss/',
+      js: '/js/',
+      libs: []
     },
-    dest: {
-      css: '/assets/css/',
-      js: '/assets/js/'
+    build: {
+      root: '/assets/',
+      css: '/css/',
+      js: '/js/'
     },
-    libs: []
+    server: {
+      root: ftpRemoteDir
+    }
   }, config);
 
   const Files = {};
 
-  Files.style = path.join(dirname, Settings.themeRoot, Settings.src.scss, 'style.scss');
+  Files.style = path.join(dirname, Settings.root, Settings.source.root, Settings.source.scss, 'style.scss');
   Files.scss = [
-    path.join(dirname, Settings.themeRoot, Settings.src.scss, '*.scss'),
-    '!' + path.join(dirname, Settings.themeRoot, Settings.src.scss, '_*.scss'),
+    path.join(dirname, Settings.root, Settings.source.root, Settings.source.scss, '*.scss'),
+    '!' + path.join(dirname, Settings.root, Settings.source.root, Settings.source.scss, '_*.scss'),
     '!' + Files.style
   ];
-  Files.php = path.join(dirname, Settings.themeRoot, '/**/*.php');
-  Files.js = path.join(dirname, Settings.themeRoot, Settings.src.js, '*.js');
-  Files.libs = Settings.libs.length ? Settings.libs.map(lib => path.join(dirname, lib)) : false;
+  Files.php = path.join(dirname, Settings.root, '/**/*.php');
+  Files.js = path.join(dirname, Settings.root, Settings.source.root, Settings.source.js, '*.js');
+  Files.libs = Settings.source.libs.length ? Settings.source.libs.map(lib => path.join(dirname, Settings.root, Settings.source.root, lib)) : false;
 
   const styleTask = () => {
     const conn = getFtpConnection();
@@ -76,7 +81,7 @@ module.exports = (config) => {
       .pipe(autoprefixer())
       .pipe(hasFtp() ? conn.newerOrDifferentSize(ftpRemoteDir) : through.obj())
       .pipe(hasFtp() ? conn.dest(ftpRemoteDir) : through.obj())
-      .pipe(dest(path.join(dirname, Settings.themeRoot)));
+      .pipe(dest(path.join(dirname, Settings.root)));
   };
 
   const scssTask = parallel(styleTask, () => {
@@ -88,9 +93,9 @@ module.exports = (config) => {
         'outputStyle': argv.dev ? 'development' : 'compressed'
       }).on('error', sass.logError))
       .pipe(autoprefixer())
-      .pipe(hasFtp() ? conn.newerOrDifferentSize(path.join(ftpRemoteDir, Settings.dest.css)) : through.obj())
-      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.dest.css)) : through.obj())
-      .pipe(dest(path.join(dirname, Settings.themeRoot, Settings.dest.css)));
+      .pipe(hasFtp() ? conn.newerOrDifferentSize(path.join(ftpRemoteDir, Settings.build.root, Settings.build.css)) : through.obj())
+      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.build.root, Settings.build.css)) : through.obj())
+      .pipe(dest(path.join(dirname, Settings.root, Settings.build.root, Settings.build.css)));
   });
 
   const jsTask = () => {
@@ -118,9 +123,9 @@ module.exports = (config) => {
         }
       })))
       .pipe(concat('main.js'))
-      .pipe(hasFtp() ? conn.newer(path.join(ftpRemoteDir, Settings.dest.js)) : through.obj())
-      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.dest.js)) : through.obj())
-      .pipe(dest(path.join(dirname, Settings.themeRoot, Settings.dest.js)));
+      .pipe(hasFtp() ? conn.newer(path.join(ftpRemoteDir, Settings.build.root, Settings.build.js)) : through.obj())
+      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.build.root, Settings.build.js)) : through.obj())
+      .pipe(dest(path.join(dirname, Settings.root, Settings.build.root, Settings.build.js)));
   };
 
   const phpTask = () => {
