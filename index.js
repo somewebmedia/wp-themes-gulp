@@ -1,4 +1,4 @@
-const gulp = require('gulp');
+const { src, dest, parallel, series, watch } = require('gulp');
 const glob = require('glob');
 const path = require('path');
 const through = require('through2');
@@ -39,7 +39,8 @@ function hasFtp() {
 }
 
 module.exports = (config) => {
-  const settings = Object.assign({
+
+  const Settings = Object.assign({
     themeRoot: '../',
     src: {
       scss: '/src/scss/',
@@ -52,20 +53,22 @@ module.exports = (config) => {
     libs: []
   }, config);
 
-  const STYLE = path.join(dirname, settings.themeRoot, settings.src.scss, 'style.scss');
-  const SCSS = [
-    path.join(dirname, settings.themeRoot, settings.src.scss, '*.scss'),
-    '!' + path.join(dirname, settings.themeRoot, settings.src.scss, '_*.scss'),
-    '!' + STYLE
-  ];
-  const PHP = path.join(dirname, settings.themeRoot, '/**/*.php');
-  const JS = path.join(dirname, settings.themeRoot, settings.src.js, '*.js');
-  const JS_LIBS = settings.libs.length ? settings.libs.map(lib => path.join(dirname, lib)) : false;
+  const Files = {};
 
-  gulp.task('style', () => {
+  Files.style = path.join(dirname, Settings.themeRoot, Settings.src.scss, 'style.scss');
+  Files.scss = [
+    path.join(dirname, Settings.themeRoot, Settings.src.scss, '*.scss'),
+    '!' + path.join(dirname, Settings.themeRoot, Settings.src.scss, '_*.scss'),
+    '!' + Files.style
+  ];
+  Files.php = path.join(dirname, Settings.themeRoot, '/**/*.php');
+  Files.js = path.join(dirname, Settings.themeRoot, Settings.src.js, '*.js');
+  Files.libs = Settings.libs.length ? Settings.libs.map(lib => path.join(dirname, lib)) : false;
+
+  const styleTask = () => {
     const conn = getFtpConnection();
 
-    return gulp.src(STYLE)
+    return src(Files.style)
       .pipe(sass({
         'includePaths': ['node_modules'],
         'outputStyle': argv.dev ? 'development' : 'compressed'
@@ -73,27 +76,27 @@ module.exports = (config) => {
       .pipe(autoprefixer())
       .pipe(hasFtp() ? conn.newerOrDifferentSize(ftpRemoteDir) : through.obj())
       .pipe(hasFtp() ? conn.dest(ftpRemoteDir) : through.obj())
-      .pipe(gulp.dest(path.join(dirname, settings.themeRoot)));
-  });
+      .pipe(dest(path.join(dirname, Settings.themeRoot)));
+  };
 
-  gulp.task('scss', ['style'], () => {
+  const scssTask = parallel(styleTask, () => {
     const conn = getFtpConnection();
 
-    return vinylfs.src(SCSS)
+    return vinylfs.src(Files.scss)
       .pipe(sass({
         'includePaths': ['node_modules'],
         'outputStyle': argv.dev ? 'development' : 'compressed'
       }).on('error', sass.logError))
       .pipe(autoprefixer())
-      .pipe(hasFtp() ? conn.newerOrDifferentSize(path.join(ftpRemoteDir, settings.dest.css)) : through.obj())
-      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, settings.dest.css)) : through.obj())
-      .pipe(gulp.dest(path.join(dirname, settings.themeRoot, settings.dest.css)));
+      .pipe(hasFtp() ? conn.newerOrDifferentSize(path.join(ftpRemoteDir, Settings.dest.css)) : through.obj())
+      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.dest.css)) : through.obj())
+      .pipe(dest(path.join(dirname, Settings.themeRoot, Settings.dest.css)));
   });
 
-  gulp.task('js', () => {
+  const jsTask = () => {
     const conn = getFtpConnection();
 
-    return gulp.src(JS)
+    return src(Files.js)
       .pipe(babel(
         {
           presets: [
@@ -106,7 +109,7 @@ module.exports = (config) => {
           ]
         }
       ))
-      .pipe(JS_LIBS ? addsrc.append(JS_LIBS) : through.obj())
+      .pipe(Files.libs ? addsrc.append(Files.libs) : through.obj())
       .pipe(gulpif(file => {
         return file.contents.toString().split(/\r\n|\r|\n/).length > 20 && !argv.dev;
       }, uglify({
@@ -115,28 +118,36 @@ module.exports = (config) => {
         }
       })))
       .pipe(concat('main.js'))
-      .pipe(hasFtp() ? conn.newer(path.join(ftpRemoteDir, settings.dest.js)) : through.obj())
-      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, settings.dest.js)) : through.obj())
-      .pipe(gulp.dest(path.join(dirname, settings.themeRoot, settings.dest.js)));
-  });
+      .pipe(hasFtp() ? conn.newer(path.join(ftpRemoteDir, Settings.dest.js)) : through.obj())
+      .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.dest.js)) : through.obj())
+      .pipe(dest(path.join(dirname, Settings.themeRoot, Settings.dest.js)));
+  };
 
-  gulp.task('php', () => {
+  const phpTask = () => {
     const conn = getFtpConnection();
 
-    return gulp.src(PHP)
+    return src(Files.php)
       .pipe(hasFtp() ? conn.newer(ftpRemoteDir) : through.obj())
       .pipe(hasFtp() ? conn.dest(ftpRemoteDir) : through.obj())
+  };
+
+  const defaultTask = parallel(scssTask, jsTask, phpTask);
+
+  const watchTask = series(defaultTask, () => {
+    const watch_scss = glob.sync(Files.scss[0]);
+    const watch_js = glob.sync(Files.js);
+    const watch_php = glob.sync(Files.php);
+
+    if (argv.scss || (!argv.scss && !argv.js && !argv.php)) watch(watch_scss, scssTask);
+    if (argv.js || (!argv.scss && !argv.js && !argv.php)) watch(watch_js, jsTask);
+    if (argv.php || (!argv.scss && !argv.js && !argv.php)) watch(watch_php, phpTask);
   });
 
-  gulp.task('default', ['scss', 'js', 'php'], () => {});
-
-  gulp.task('watch', ['default'], () => {
-    const watch_scss = glob.sync(SCSS[0]);
-    const watch_js = glob.sync(JS);
-    const watch_php = glob.sync(PHP);
-
-    if (argv.scss || (!argv.scss && !argv.js && !argv.php)) gulp.watch(watch_scss, ['scss']);
-    if (argv.js || (!argv.scss && !argv.js && !argv.php)) gulp.watch(watch_js, ['js']);
-    if (argv.php || (!argv.scss && !argv.js && !argv.php)) gulp.watch(watch_php, ['php']);
-  });
+  return {
+    scss: scssTask,
+    js: jsTask,
+    php: phpTask,
+    watch: watchTask,
+    default: defaultTask
+  };
 };
