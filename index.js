@@ -70,7 +70,7 @@ module.exports = (config) => {
   Files.js = path.join(dirname, Settings.root, Settings.source.root, Settings.source.js, '*.js');
   Files.libs = Settings.source.libs.length ? Settings.source.libs.map(lib => path.join(dirname, Settings.root, Settings.source.root, lib)) : false;
 
-  const styleTask = () => {
+  const compileMainStyle = () => {
     const conn = getFtpConnection();
 
     return src(Files.style)
@@ -84,7 +84,7 @@ module.exports = (config) => {
       .pipe(dest(path.join(dirname, Settings.root)));
   };
 
-  const scssTask = parallel(styleTask, () => {
+  const compileScss = () => {
     const conn = getFtpConnection();
 
     return vinylfs.src(Files.scss)
@@ -96,9 +96,11 @@ module.exports = (config) => {
       .pipe(hasFtp() ? conn.newerOrDifferentSize(path.join(ftpRemoteDir, Settings.build.root, Settings.build.css)) : through.obj())
       .pipe(hasFtp() ? conn.dest(path.join(ftpRemoteDir, Settings.build.root, Settings.build.css)) : through.obj())
       .pipe(dest(path.join(dirname, Settings.root, Settings.build.root, Settings.build.css)));
-  });
+  };
 
-  const jsTask = () => {
+  const scssTask = parallel(compileMainStyle, compileScss);
+
+  const compileJs = () => {
     const conn = getFtpConnection();
 
     return src(Files.js)
@@ -136,23 +138,23 @@ module.exports = (config) => {
       .pipe(hasFtp() ? conn.dest(ftpRemoteDir) : through.obj())
   };
 
-  const defaultTask = parallel(scssTask, jsTask, phpTask);
+  const defaultTask = parallel(scssTask, compileJs, phpTask);
 
-  const watchTask = series(defaultTask, () => {
+  const watchFiles = () => {
     const watch_scss = glob.sync(Files.scss[0]);
     const watch_js = glob.sync(Files.js);
     const watch_php = glob.sync(Files.php);
 
     if (argv.scss || (!argv.scss && !argv.js && !argv.php)) watch(watch_scss, scssTask);
-    if (argv.js || (!argv.scss && !argv.js && !argv.php)) watch(watch_js, jsTask);
+    if (argv.js || (!argv.scss && !argv.js && !argv.php)) watch(watch_js, compileJs);
     if (argv.php || (!argv.scss && !argv.js && !argv.php)) watch(watch_php, phpTask);
-  });
+  };
 
   return {
     scss: scssTask,
-    js: jsTask,
+    js: compileJs,
     php: phpTask,
-    watch: watchTask,
+    watch: series(defaultTask, watchFiles),
     default: defaultTask
   };
 };
